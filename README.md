@@ -34,12 +34,13 @@ Dans une autre fenetre shell
 ```
 cd slave
 erl -make
-./start.sh
+./start.sh node1@host1
+(node1@host1)1> net_kernel:connect_node('master@localhost').
 ```
 
 Depuis le shell du master
 ```
-(master@localhost)1> gen_server:call({calcul_slave_server, 'slave@localhost'}, {calculate, 1, 100}).
+(master@localhost)1> calcul_api:sum_squares(1,100).
 ```
 
 ##TODO
