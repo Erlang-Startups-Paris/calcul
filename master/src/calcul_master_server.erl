@@ -21,32 +21,37 @@ start_link() ->
 sum_squares(First_num, Last_num) ->
     gen_server:call(?SERVER, reset),
     Active_clients = gen_server:call(?SERVER, get_active_clients),
-    io:fwrite("~nActive clients:~p~n", [Active_clients]),
-    Results = send_calculations(First_num, Last_num, (Last_num - First_num) div length(Active_clients), Active_clients, 0),
-    io:fwrite("old send calc results:~p~n", [Results]),
-    Results = get_results(),
-    gen_server:call(?SERVER, reset),
-    Results.
+    io:fwrite("~nActive clients:~p~n~n", [Active_clients]),
+    send_calculations(First_num, Last_num, (Last_num - First_num) div length(Active_clients), Active_clients),
+    get_results(),
+    ok.
 
 get_results () ->
     check_results (gen_server:call(?SERVER, get_results)).
 
 check_results({Result_final, []}) ->
-    io:fwrite("check results ready :~p~n", [Result_final]),
+    io:fwrite("~nFinal result :~p~n~n", [Result_final]),
     Result_final;
 check_results({Results_tmp, Remaining_clients}) ->
     io:fwrite("Intermediate results:~p~n", [Results_tmp]),
     io:fwrite("Missing clients:~p~n", [Remaining_clients]),
-    Next_check = 1000000,
-    io:fwrite("Check in ~p seconds~n ", [Next_check/1000000]),
+    Next_check = 1000,
+    io:fwrite("Check in ~p seconds~n~n", [Next_check/1000]),
     timer:apply_after(Next_check, ?MODULE, get_results, []).
 
-send_calculations(First_num, Last_num, _, [Node], Results) ->
+%%  Results = send_calculations_sync(First_num, Last_num, (Last_num - First_num) div length(Active_clients), Active_clients, 0),
+send_calculations(First_num, Last_num, _, [Node]) ->
+    gen_server:cast({?CLIENT_PROC, Node}, {calculate, First_num, Last_num});
+send_calculations(First_num, Last_num, Chunk_len, [Node | Active_clients]) ->
+    gen_server:cast({?CLIENT_PROC, Node}, {calculate, Last_num - Chunk_len + 1, Last_num}),
+    send_calculations(First_num, Last_num - Chunk_len, Chunk_len, Active_clients).    
+
+send_calculations_sync(First_num, Last_num, _, [Node], Results) ->
     Result = gen_server:call({?CLIENT_PROC, Node}, {calculate, First_num, Last_num}),
     Result + Results;
-send_calculations(First_num, Last_num, Chunk_len, [Node | Active_clients], Results) ->
+send_calculations_sync(First_num, Last_num, Chunk_len, [Node | Active_clients], Results) ->
     Result = gen_server:call({?CLIENT_PROC, Node}, {calculate, Last_num - Chunk_len + 1, Last_num}),
-    send_calculations(First_num, Last_num - Chunk_len, Chunk_len, Active_clients, Result + Results).    
+    send_calculations_sync(First_num, Last_num - Chunk_len, Chunk_len, Active_clients, Result + Results).    
 
 
 %% Synchronous call
