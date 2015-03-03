@@ -40,7 +40,7 @@ erl -make
 
 Depuis le shell du master
 ```
-(master@localhost)1> calcul_api:sum_squares(1,100).
+(master@localhost)1> calcul_master_server:sum_squares(1,100).
 ```
 
 ##TODO
