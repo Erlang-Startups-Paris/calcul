@@ -23,7 +23,14 @@ close(Pid) ->
 init([]) -> {ok, []}. %% no treatment of info here!
 
 handle_call({calculate, N, M}, _From, State) ->
-    Result = calcul_slave_lib:run(N, M),
+    {Hour, Min, Sec} = time(),
+
+    io:format("~n  [~ph:~pm:~ps] Runing ~p -> ~p ...", [Hour, Min, Sec, N, M]),
+
+    {Duration, Result} = timer:tc(calcul_slave_lib, run, [N, M]),
+
+    io: format ("~n    => ~p in (~p ms)~n", [Result, Duration/1000]),
+
     {reply, Result, State};
 
 handle_call(terminate, _From, State) ->
