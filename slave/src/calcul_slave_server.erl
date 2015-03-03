@@ -29,6 +29,12 @@ handle_call({calculate, N, M}, _From, State) ->
 handle_call(terminate, _From, State) ->
     {stop, normal, ok, State}.
 
+handle_cast({calculate, N, M}, State) ->
+    Result = calcul_slave_lib:run(N, M),
+    io:fwrite("node : ~p handle cast with result:~p~n ",[node(), Result]),
+    gen_server:cast({calcul_master_server, master@localhost}, {set_local_result, Result}),
+    {noreply, State};
+
 handle_cast({return, Cat}, State) ->
     {noreply, [Cat|State]}.
 
