@@ -20,18 +20,23 @@ start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 sum_squares(First_num, Last_num) ->
+    Time_start = erlang:now(),
     (not is_pid(whereis(?MASTER))) andalso register(?MASTER, self()),
     gen_server:call(?SERVER, reset),
     Active_clients = gen_server:call(?SERVER, get_active_clients),
     io:fwrite("~nActive clients:~p~n~n", [Active_clients]),
     send_calculations(First_num, Last_num, (Last_num - First_num) div length(Active_clients), Active_clients),
-    get_result().
+    Result = get_result(),
+    Time_diff = timer:now_diff(erlang:now(), Time_start),
+    {Result, Time_diff div 1000}.
+    
         
 sum_squares_seq(First_num, Last_num) ->
+    Time_start = erlang:now(),
     Active_clients = gen_server:call(?SERVER, get_active_clients),
-    send_calculations_sync(First_num, Last_num, (Last_num - First_num) div length(Active_clients), Active_clients, 0).
-
-
+    Result = send_calculations_sync(First_num, Last_num, (Last_num - First_num) div length(Active_clients), Active_clients, 0),
+    Time_diff = timer:now_diff(erlang:now(), Time_start),
+    {Result, Time_diff div 1000}.
 
 %% Synchronous call
 calculate(Pid, N, M) ->
