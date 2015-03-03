@@ -29,8 +29,6 @@ handle_call({calculate, N, M}, _From, State) ->
     {Duration, Result} = timer:tc(calcul_slave_lib, run, [N, M]),
     io: format ("~n    => ~p in (~p ms)~n", [Result, Duration/1000]),
 
-    gen_server:cast({calcul_master_server, master@localhost}, {set_local_result, Result, node()}),
-
     {reply, Result, State};
 
 handle_call(terminate, _From, State) ->

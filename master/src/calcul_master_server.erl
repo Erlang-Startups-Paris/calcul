@@ -9,54 +9,28 @@
 %% internal
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
--export([get_results/0]).
 
 -define (SERVER, ?MODULE).
 -define (CLIENT_PROC, calcul_slave_server).
 -define (RESULT, result_table).
+-define (MASTER, master_node).
 
 %%% Client API
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 sum_squares(First_num, Last_num) ->
+    (not is_pid(whereis(?MASTER))) andalso register(?MASTER, self()),
     gen_server:call(?SERVER, reset),
     Active_clients = gen_server:call(?SERVER, get_active_clients),
     io:fwrite("~nActive clients:~p~n~n", [Active_clients]),
     send_calculations(First_num, Last_num, (Last_num - First_num) div length(Active_clients), Active_clients),
-    get_results(),
-    ok.
-
+    get_result().
+        
 sum_squares_seq(First_num, Last_num) ->
     Active_clients = gen_server:call(?SERVER, get_active_clients),
     send_calculations_sync(First_num, Last_num, (Last_num - First_num) div length(Active_clients), Active_clients, 0).
 
-get_results () ->
-    check_results (gen_server:call(?SERVER, get_results)).
-
-check_results({Result_final, []}) ->
-    io:fwrite("~nFinal result :~p~n~n", [Result_final]),
-    Result_final;
-check_results({Results_tmp, Remaining_clients}) ->
-    io:fwrite("Intermediate results:~p~n", [Results_tmp]),
-    io:fwrite("Missing clients:~p~n", [Remaining_clients]),
-    Next_check = 1000,
-    io:fwrite("Check in ~p seconds~n~n", [Next_check/1000]),
-    timer:apply_after(Next_check, ?MODULE, get_results, []).
-
-%%  Results = send_calculations_sync(First_num, Last_num, (Last_num - First_num) div length(Active_clients), Active_clients, 0),
-send_calculations(First_num, Last_num, _, [Node]) ->
-    gen_server:cast({?CLIENT_PROC, Node}, {calculate, First_num, Last_num});
-send_calculations(First_num, Last_num, Chunk_len, [Node | Active_clients]) ->
-    gen_server:cast({?CLIENT_PROC, Node}, {calculate, Last_num - Chunk_len + 1, Last_num}),
-    send_calculations(First_num, Last_num - Chunk_len, Chunk_len, Active_clients).    
-
-send_calculations_sync(First_num, Last_num, _, [Node], Results) ->
-    Result = gen_server:call({?CLIENT_PROC, Node}, {calculate, First_num, Last_num}),
-    Result + Results;
-send_calculations_sync(First_num, Last_num, Chunk_len, [Node | Active_clients], Results) ->
-    Result = gen_server:call({?CLIENT_PROC, Node}, {calculate, Last_num - Chunk_len + 1, Last_num}),
-    send_calculations_sync(First_num, Last_num - Chunk_len, Chunk_len, Active_clients, Result + Results).    
 
 
 %% Synchronous call
@@ -100,18 +74,21 @@ handle_call({calculate, _N, _M}, _From, State) ->
 handle_call(terminate, _From, State) ->
     {stop, normal, ok, State}.
 
-handle_cast({set_local_result, Result_local, Client}, Remaining_clients) ->
-    %% store result
+handle_cast({set_local_result, Result_local, Client}, [Client]) ->
+    %% last client call
     io:fwrite("client ~p local result ~p~n", [Client, Result_local]),
-    [{result_global,Result_global}] = ets:lookup(?RESULT, result_global),
-    ets:insert(?RESULT, [{{result_local, Client}, Result_local},
-			 {result_global, Result_global + Result_local}]),
+    Result_global = store_result(Client, Result_local),
+    ?MASTER ! {result_global, Result_global},
+    {noreply, []};
+handle_cast({set_local_result, Result_local, Client}, Remaining_clients) ->
+    io:fwrite("client ~p local result ~p~n", [Client, Result_local]),
+    store_result(Client, Result_local),
     {noreply, Remaining_clients -- [Client]};
 handle_cast({return, Cat}, State) ->
     {noreply, [Cat|State]}.
 
-handle_info(_Msg, State) ->
-    io:format("Unexpected message: ~n"),
+handle_info(Msg, State) ->
+    io:format("Unexpected message: ~p~n", [Msg]),
     {noreply, State}.
 
 terminate(normal, _State) ->
@@ -122,3 +99,31 @@ code_change(_OldVsn, State, _Extra) ->
     %% No change planned. The function is there for the behaviour,
     %% but will not be used. Only a version on the next
     {ok, State}.
+
+%%% Internal functions
+send_calculations(First_num, Last_num, _, [Node]) ->
+    gen_server:cast({?CLIENT_PROC, Node}, {calculate, First_num, Last_num});
+send_calculations(First_num, Last_num, Chunk_len, [Node | Active_clients]) ->
+    gen_server:cast({?CLIENT_PROC, Node}, {calculate, Last_num - Chunk_len + 1, Last_num}),
+    send_calculations(First_num, Last_num - Chunk_len, Chunk_len, Active_clients).    
+
+send_calculations_sync(First_num, Last_num, _, [Node], Results) ->
+    Result = gen_server:call({?CLIENT_PROC, Node}, {calculate, First_num, Last_num}),
+    Result + Results;
+send_calculations_sync(First_num, Last_num, Chunk_len, [Node | Active_clients], Results) ->
+    Result = gen_server:call({?CLIENT_PROC, Node}, {calculate, Last_num - Chunk_len + 1, Last_num}),
+    send_calculations_sync(First_num, Last_num - Chunk_len, Chunk_len, Active_clients, Result + Results).    
+store_result(Client, Result_local) ->
+    [{result_global, Result_global_old}] = ets:lookup(?RESULT, result_global),
+    Result_global = Result_global_old + Result_local,
+    ets:insert(?RESULT, [{{result_local, Client}, Result_local},
+			 {result_global, Result_global}]),
+    Result_global.
+
+get_result() ->
+    receive
+	{result_global, Result} ->
+	    Result
+    after 10000 ->
+	    result_timeout
+    end.
