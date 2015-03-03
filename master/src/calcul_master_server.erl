@@ -3,6 +3,7 @@
 
 %% API
 -export([sum_squares/2]).
+-export([sum_squares_seq/2]).
 %% gen_server
 -export([start_link/0, calculate/3, close/1]).
 %% internal
@@ -25,6 +26,10 @@ sum_squares(First_num, Last_num) ->
     send_calculations(First_num, Last_num, (Last_num - First_num) div length(Active_clients), Active_clients),
     get_results(),
     ok.
+
+sum_squares_seq(First_num, Last_num) ->
+    Active_clients = gen_server:call(?SERVER, get_active_clients),
+    send_calculations_sync(First_num, Last_num, (Last_num - First_num) div length(Active_clients), Active_clients, 0).
 
 get_results () ->
     check_results (gen_server:call(?SERVER, get_results)).
