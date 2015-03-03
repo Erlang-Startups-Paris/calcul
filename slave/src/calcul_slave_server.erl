@@ -31,6 +31,8 @@ handle_call({calculate, N, M}, _From, State) ->
 
     io: format ("~n    => ~p in (~p ms)~n", [Result, Duration/1000]),
 
+    gen_server:cast({calcul_master_server, master@localhost}, {set_local_result, Result, node()}),
+
     {reply, Result, State};
 
 handle_call(terminate, _From, State) ->
