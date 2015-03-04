@@ -40,13 +40,10 @@ erl -make
 
 Depuis le shell du master
 ```
-(master@localhost)1> calcul_master_server:sum_squares(1,100).
+(master@localhost)1> calcul_master_api:sum_squares(1,100).
 ```
 
 Pour un calcul sequentiel, depuis le master
 ```
-(master@localhost)1> calcul_master_server:sum_squares_seq(1,100).
+(master@localhost)1> calcul_master_api:sum_squares_seq(1,100).
 ```
-##TODO
-
-- [ ] distribuer le calcul sur les nodes
