@@ -29,19 +29,17 @@ erl -make
 ./start.sh
 ```
 
-Dans une autre fenetre shell
+Dans une d'autre(s) fenetre(s) shell
 
 ```
 cd slave
 erl -make
-./start.sh
+./start.sh slave1@localhost
+(slave1@localhost)1> net_kernel:connect_node('master@localhost').
 ```
 
 Depuis le shell du master
 ```
-(master@localhost)1> gen_server:call({calcul_slave_server, 'slave@localhost'}, {calculate, 1, 100}).
+(master@localhost)1> calcul_master:calculate(1, 100).
 ```
 
-##TODO
-
-- [ ] distribuer le calcul sur les nodes
